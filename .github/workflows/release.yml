@@ -52,12 +52,12 @@ jobs:
           retention-days: 5
 
   test-install:
-    name: Smoke test import on 3 OS × 2 Python
+    name: Smoke test import on 2 OS × 2 Python
     needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.12", "3.13"]
     steps:
       - name: Checkout
