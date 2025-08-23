@@ -1,218 +1,188 @@
-name: Release and Publish to PyPI
+name: Release & Publish (Trusted Publisher)
 
 on:
+  # Tag pushes publish to real PyPI (e.g., v0.1.0)
   push:
     tags:
-      - 'v*'  # Trigger on version tags like v0.1.0, v1.0.0, etc.
+      - "v*"
+  # Manual runs publish to TestPyPI
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 0.1.1)'
-        required: true
-        type: string
 
+# Only what's needed globally. OIDC is set per publish job.
 permissions:
-  contents: write
-  id-token: write  # Required for OIDC/trusted publishing
-  actions: write
+  contents: write   # needed for creating GitHub releases on tag
+  actions: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
-    name: Build Distribution
+    name: Build distributions (sdist + wheel)
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Full history for changelog generation
-        
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install build twine
-        
-    - name: Build distribution
-      run: python -m build
-      
-    - name: Check distribution
-      run: twine check dist/*
-      
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-        retention-days: 5
-        if-no-files-found: error
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  test-package:
-    name: Test Package Installation
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Build
+        run: python -m build
+
+      - name: Validate artifacts (twine check)
+        run: python -m twine check dist/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 5
+
+  test-install:
+    name: Smoke test import on 3 OS × 2 Python
     needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ['3.12', '3.13']
-    
+        python-version: ["3.12", "3.13"]
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-        
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-        
-    - name: Install package
-      shell: bash
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install dist/*.whl
-        
-    - name: Test import
-      run: |
-        python -c "from nous_llm import NousLLM; print('Import successful')"
-        python -c "from nous_llm import __version__; print(f'Version: {__version__}')"
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  create-github-release:
-    name: Create GitHub Release
-    needs: [build, test-package]
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Install built wheel/sdist
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          # Prefer wheel if present; fall back to sdist
+          WHEEL=$(ls dist/*.whl 2>/dev/null || true)
+          if [ -n "$WHEEL" ]; then
+            python -m pip install "$WHEEL"
+          else
+            python -m pip install dist/*.tar.gz
+          fi
+
+      - name: Import test
+        run: |
+          python - << 'PY'
+          from nous_llm import NousLLM, __version__
+          print("Import OK, version:", __version__)
+          PY
+
+  github-release:
+    # Only create a GitHub release when a tag triggered the workflow
+    if: startsWith(github.ref, 'refs/tags/')
+    name: Create GitHub Release (on tag)
+    needs: [build, test-install]
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.extract_version.outputs.version }}
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-        
-    - name: Extract version
-      id: extract_version
-      run: |
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          VERSION="${{ github.event.inputs.version }}"
-        else
-          VERSION=${GITHUB_REF#refs/tags/v}
-        fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Version: $VERSION"
-        
-    - name: Generate changelog
-      id: changelog
-      run: |
-        # Generate changelog from commit history
-        cat > release_notes.md << 'EOF'
-        ## What's Changed
-        
-        ### ✨ Features
-        - Unified interface for multiple LLM providers (OpenAI, Anthropic, Gemini, xAI, OpenRouter)
-        - Async-first design with RORO pattern
-        - Type-complete implementation with Pydantic v2
-        - Automatic provider detection and adapter loading
-        - Comprehensive error handling and retry logic
-        - Support for streaming and function calling
-        
-        ### 📦 Package Details
-        - **Version**: ${{ steps.extract_version.outputs.version }}
-        - **Python Support**: 3.12+
-        - **License**: MIT
-        
-        ### 🚀 Installation
-        
-        ```bash
-        # Core package
-        pip install nous-llm
-        
-        # With specific providers
-        pip install nous-llm[openai]
-        pip install nous-llm[anthropic]
-        pip install nous-llm[gemini]
-        pip install nous-llm[xai]
-        pip install nous-llm[all]
-        ```
-        
-        ### 📖 Documentation
-        - [GitHub Repository](https://github.com/amod-ml/nous-llm)
-        - [PyPI Package](https://pypi.org/project/nous-llm/)
-        
-        **Full Changelog**: https://github.com/amod-ml/nous-llm/compare/v0.0.1...v${{ steps.extract_version.outputs.version }}
-        EOF
-        
-    - name: Create GitHub Release
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        VERSION="${{ steps.extract_version.outputs.version }}"
-        
-        # Create release with artifacts
-        gh release create "v${VERSION}" \
-          --title "v${VERSION}" \
-          --notes-file release_notes.md \
-          --verify-tag \
-          dist/*
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  publish-to-testpypi:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Extract version from tag
+        id: v
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Compose basic release notes
+        run: |
+          cat > release_notes.md <<EOF
+          ## Release v${{ steps.v.outputs.version }}
+          Built from tag \`v${{ steps.v.outputs.version }}\`.
+
+          - Distributions: sdist + wheel
+          - Python: 3.12+
+          EOF
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.v.outputs.version }}" \
+            --title "v${{ steps.v.outputs.version }}" \
+            --notes-file release_notes.md \
+            dist/*
+
+  publish-testpypi:
+    # Manual runs publish to TestPyPI (no tag required)
+    if: github.event_name == 'workflow_dispatch'
     name: Publish to TestPyPI
-    needs: [build, test-package]
+    needs: [build, test-install]
     runs-on: ubuntu-latest
-    environment:
-      name: test-pypi
-      url: https://test.pypi.org/p/nous-llm
+    environment: testpypi   # MUST MATCH the environment configured on TestPyPI
     permissions:
-      id-token: write
-    
+      id-token: write       # OIDC for Trusted Publishing
+      contents: read
     steps:
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-        
-    - name: Publish to TestPyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        skip-existing: true
-        verbose: true
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
 
-  publish-to-pypi:
+      - name: Publish (TestPyPI)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist
+          skip-existing: true
+          verbose: true
+
+  publish-pypi:
+    # Tag pushes publish to real PyPI
+    if: startsWith(github.ref, 'refs/tags/')
     name: Publish to PyPI
-    needs: [build, test-package, create-github-release, publish-to-testpypi]
+    needs: [build, test-install, github-release]
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/nous-llm
+    environment: pypi       # MUST MATCH the environment configured on PyPI
     permissions:
-      id-token: write
-    
+      id-token: write       # OIDC for Trusted Publishing
+      contents: read
     steps:
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-        
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        verbose: true
-        print-hash: true
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish (PyPI)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          skip-existing: true   # helpful while iterating; remove when strict
+          verbose: true
+          print-hash: true
