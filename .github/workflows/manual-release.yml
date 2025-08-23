@@ -1,0 +1,165 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+          - prerelease
+      prerelease_token:
+        description: 'Prerelease token (alpha, beta, rc)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - alpha
+          - beta
+          - rc
+      dry_run:
+        description: 'Dry run (no actual release)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      
+    - name: Install dependencies
+      run: |
+        uv sync
+        uv add --dev python-semantic-release
+        
+    - name: Configure Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+    - name: Get current version
+      id: current_version
+      run: |
+        CURRENT_VERSION=$(grep "^version = " pyproject.toml | cut -d'"' -f2)
+        echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current version: $CURRENT_VERSION"
+        
+    - name: Calculate new version
+      id: new_version
+      run: |
+        CURRENT="${{ steps.current_version.outputs.version }}"
+        TYPE="${{ github.event.inputs.release_type }}"
+        TOKEN="${{ github.event.inputs.prerelease_token }}"
+        
+        # Simple version bump logic
+        IFS='.' read -r major minor patch <<< "$CURRENT"
+        patch=${patch%%[a-z]*}  # Remove any prerelease suffix
+        
+        case "$TYPE" in
+          major)
+            NEW_VERSION="$((major + 1)).0.0"
+            ;;
+          minor)
+            NEW_VERSION="$major.$((minor + 1)).0"
+            ;;
+          patch)
+            NEW_VERSION="$major.$minor.$((patch + 1))"
+            ;;
+          premajor)
+            NEW_VERSION="$((major + 1)).0.0-${TOKEN:-alpha}.1"
+            ;;
+          preminor)
+            NEW_VERSION="$major.$((minor + 1)).0-${TOKEN:-alpha}.1"
+            ;;
+          prepatch)
+            NEW_VERSION="$major.$minor.$((patch + 1))-${TOKEN:-alpha}.1"
+            ;;
+          prerelease)
+            if [[ $CURRENT == *"-"* ]]; then
+              # Increment prerelease version
+              base=${CURRENT%%-*}
+              suffix=${CURRENT#*-}
+              prerel_num=${suffix##*.}
+              prerel_type=${suffix%.*}
+              NEW_VERSION="$base-$prerel_type.$((prerel_num + 1))"
+            else
+              NEW_VERSION="$CURRENT-${TOKEN:-alpha}.1"
+            fi
+            ;;
+        esac
+        
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version: $NEW_VERSION"
+        
+    - name: Update version in pyproject.toml
+      if: ${{ github.event.inputs.dry_run != 'true' }}
+      run: |
+        sed -i 's/^version = .*/version = "${{ steps.new_version.outputs.new_version }}"/' pyproject.toml
+        
+    - name: Update version in __init__.py
+      if: ${{ github.event.inputs.dry_run != 'true' }}
+      run: |
+        echo '__version__ = "${{ steps.new_version.outputs.new_version }}"' > src/nous_llm/__init__.py
+        echo 'from nous_llm.core.client import NousLLM' >> src/nous_llm/__init__.py
+        echo 'from nous_llm.core.models import ProviderConfig' >> src/nous_llm/__init__.py
+        echo '' >> src/nous_llm/__init__.py
+        echo '__all__ = ["NousLLM", "ProviderConfig", "__version__"]' >> src/nous_llm/__init__.py
+        
+    - name: Commit version bump
+      if: ${{ github.event.inputs.dry_run != 'true' }}
+      run: |
+        git add pyproject.toml src/nous_llm/__init__.py
+        git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }}"
+        
+    - name: Create and push tag
+      if: ${{ github.event.inputs.dry_run != 'true' }}
+      run: |
+        git tag -a "v${{ steps.new_version.outputs.new_version }}" -m "Release v${{ steps.new_version.outputs.new_version }}"
+        git push origin main
+        git push origin "v${{ steps.new_version.outputs.new_version }}"
+        
+    - name: Trigger release workflow
+      if: ${{ github.event.inputs.dry_run != 'true' }}
+      run: |
+        echo "✅ Version bumped to ${{ steps.new_version.outputs.new_version }}"
+        echo "✅ Tag v${{ steps.new_version.outputs.new_version }} created and pushed"
+        echo "🚀 Release workflow will be triggered automatically"
+        
+    - name: Dry run summary
+      if: ${{ github.event.inputs.dry_run == 'true' }}
+      run: |
+        echo "🔍 DRY RUN SUMMARY"
+        echo "=================="
+        echo "Current version: ${{ steps.current_version.outputs.version }}"
+        echo "New version would be: ${{ steps.new_version.outputs.new_version }}"
+        echo "Release type: ${{ github.event.inputs.release_type }}"
+        echo ""
+        echo "No changes were made. Remove dry_run flag to perform actual release."

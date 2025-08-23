@@ -6,7 +6,7 @@ OpenRouter, xAI, and Anthropic APIs through typed models and RORO patterns.
 
 from __future__ import annotations
 
-from .core.client import LLMClient
+from .core.client import LLMClient, NousLLM
 from .core.exceptions import (
     AuthError,
     ConfigurationError,
@@ -32,6 +32,7 @@ __all__ = [
     "GenParams",
     "LLMClient",
     "LLMResponse",
+    "NousLLM",
     "Prompt",
     "ProviderConfig",
     "ProviderError",
@@ -41,4 +42,5 @@ __all__ = [
     "ValidationError",
     "agenenerate",
     "generate",
+    "__version__",
 ]

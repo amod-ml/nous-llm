@@ -121,3 +121,7 @@ class LLMClient:
     def __repr__(self) -> str:
         """Return string representation of the client."""
         return f"LLMClient(provider={self.config.provider}, model={self.config.model})"
+
+
+# Alias for backward compatibility and brand naming
+NousLLM = LLMClient
