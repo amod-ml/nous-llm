@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+keys.txt
+LLM_Wrapper_PRD.md
+.cursorignore
+.python-version
