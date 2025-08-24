@@ -6,7 +6,9 @@ openai Python package for Chat Completions API.
 
 from __future__ import annotations
 
+import logging
 import re
+import warnings
 from typing import Any
 
 import anyio
@@ -14,6 +16,8 @@ import anyio
 from ..core.exceptions import AuthError, ProviderError, RateLimitError
 from ..core.models import GenParams, LLMResponse, Prompt, ProviderConfig, Usage
 from .base import BaseAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIAdapter(BaseAdapter):
@@ -74,6 +78,35 @@ class OpenAIAdapter(BaseAdapter):
                     provider="openai",
                 ) from e
         return self._async_client
+
+    def _requires_fixed_temperature(self, model: str) -> bool:
+        """Check if a model requires fixed temperature=1.0.
+        
+        Based on OpenAI's API restrictions as of August 2025:
+        - O-series reasoning models (o1, o3, o4-mini) require temperature=1
+        - GPT-5 thinking/reasoning variants require temperature=1
+        - Regular GPT models support variable temperature
+        
+        Args:
+            model: The model name to check.
+            
+        Returns:
+            True if model requires fixed temperature=1.0, False otherwise.
+        """
+        model_lower = model.lower()
+        
+        # O-series reasoning models require fixed temperature
+        # Matches: o1, o1-mini, o3, o3-mini, o3-pro, o4-mini, etc.
+        if re.match(r"^o[1-9]([-.].+)?$", model_lower):
+            return True
+            
+        # GPT-5 thinking/reasoning variants require fixed temperature
+        # Note: Regular GPT-5 may support temperature, but thinking variants don't
+        if "gpt-5" in model_lower and ("thinking" in model_lower or "reasoning" in model_lower):
+            return True
+            
+        # All other models support variable temperature
+        return False
 
     def _uses_completion_tokens(self, model: str) -> bool:
         """Check if a model uses max_completion_tokens instead of max_tokens.
@@ -139,11 +172,23 @@ class OpenAIAdapter(BaseAdapter):
         # Determine which token parameter to use based on model
         token_param = "max_completion_tokens" if self._uses_completion_tokens(config.model) else "max_tokens"
         
+        # Check if model requires fixed temperature
+        temperature = params.temperature
+        if self._requires_fixed_temperature(config.model):
+            if temperature != 1.0:
+                warnings.warn(
+                    f"Model {config.model} requires temperature=1.0. "
+                    f"Ignoring requested temperature={temperature:.1f} and using 1.0 instead.",
+                    UserWarning,
+                    stacklevel=3
+                )
+            temperature = 1.0
+        
         request_params = {
             "model": config.model,
             "messages": messages,
             token_param: params.max_tokens,
-            "temperature": params.temperature,
+            "temperature": temperature,
         }
 
         # Add optional parameters
@@ -288,8 +333,9 @@ class OpenAIAdapter(BaseAdapter):
             return self._parse_response(response, config)
 
         except Exception as e:
-            # Check for the specific max_tokens parameter error and retry with fallback
             error_str = str(e)
+            
+            # Check for the specific max_tokens parameter error and retry with fallback
             if ("max_tokens" in error_str and 
                 "not supported" in error_str and 
                 "max_completion_tokens" in error_str):
@@ -307,7 +353,32 @@ class OpenAIAdapter(BaseAdapter):
                         # If fallback also fails, raise the fallback error
                         raise self._handle_openai_exception(fallback_e) from fallback_e
             
-            # If not the specific parameter error, or fallback failed, raise original error
+            # Check for temperature parameter error and retry with temperature=1.0
+            elif ("temperature" in error_str and 
+                  "does not support" in error_str and 
+                  "Only the default (1) value is supported" in error_str):
+                
+                # Retry with temperature=1.0
+                request_params_fallback = request_params.copy()
+                if request_params_fallback.get("temperature") != 1.0:
+                    original_temp = request_params_fallback.get("temperature")
+                    request_params_fallback["temperature"] = 1.0
+                    
+                    warnings.warn(
+                        f"Model {config.model} requires temperature=1.0. "
+                        f"Automatically adjusted from {original_temp:.1f} to 1.0.",
+                        UserWarning,
+                        stacklevel=2
+                    )
+                    
+                    try:
+                        response = client.chat.completions.create(**request_params_fallback)
+                        return self._parse_response(response, config)
+                    except Exception as fallback_e:
+                        # If fallback also fails, raise the fallback error
+                        raise self._handle_openai_exception(fallback_e) from fallback_e
+            
+            # If not a specific parameter error, raise original error
             raise self._handle_openai_exception(e) from e
 
     async def agenenerate(
@@ -336,8 +407,9 @@ class OpenAIAdapter(BaseAdapter):
             return self._parse_response(response, config)
 
         except Exception as e:
-            # Check for the specific max_tokens parameter error and retry with fallback
             error_str = str(e)
+            
+            # Check for the specific max_tokens parameter error and retry with fallback
             if ("max_tokens" in error_str and 
                 "not supported" in error_str and 
                 "max_completion_tokens" in error_str):
@@ -355,8 +427,33 @@ class OpenAIAdapter(BaseAdapter):
                         # If fallback also fails, raise the fallback error
                         raise self._handle_openai_exception(fallback_e) from fallback_e
             
+            # Check for temperature parameter error and retry with temperature=1.0
+            elif ("temperature" in error_str and 
+                  "does not support" in error_str and 
+                  "Only the default (1) value is supported" in error_str):
+                
+                # Retry with temperature=1.0
+                request_params_fallback = request_params.copy()
+                if request_params_fallback.get("temperature") != 1.0:
+                    original_temp = request_params_fallback.get("temperature")
+                    request_params_fallback["temperature"] = 1.0
+                    
+                    warnings.warn(
+                        f"Model {config.model} requires temperature=1.0. "
+                        f"Automatically adjusted from {original_temp:.1f} to 1.0.",
+                        UserWarning,
+                        stacklevel=2
+                    )
+                    
+                    try:
+                        response = await client.chat.completions.create(**request_params_fallback)
+                        return self._parse_response(response, config)
+                    except Exception as fallback_e:
+                        # If fallback also fails, raise the fallback error
+                        raise self._handle_openai_exception(fallback_e) from fallback_e
+            
             # Try fallback to sync in thread if async fails
-            if "async" in str(e).lower():
+            elif "async" in error_str:
                 return await anyio.to_thread.run_sync(self.generate, config, prompt, params)
 
             raise self._handle_openai_exception(e) from e

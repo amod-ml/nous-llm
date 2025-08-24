@@ -6,6 +6,7 @@ parameters across different OpenAI model families (GPT-4, GPT-5, O-series).
 
 from __future__ import annotations
 
+import warnings
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -248,3 +249,157 @@ class TestOpenAIParameterMapping:
 
         # Verify response was parsed correctly
         assert response.text == "Paris is the capital of France."
+
+    def test_temperature_fixed_for_o_series_models(self, adapter: OpenAIAdapter) -> None:
+        """Test that O-series models get fixed temperature=1.0."""
+        # Test various O-series models
+        test_models = [
+            "o1",
+            "o1-mini",
+            "o3",
+            "o3-mini",
+            "o3-pro",
+            "o4-mini",
+        ]
+        
+        for model in test_models:
+            assert adapter._requires_fixed_temperature(model), f"Model {model} should require fixed temperature"
+                
+        # Test that regular models don't require fixed temperature
+        regular_models = [
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-5",
+            "gpt-5-mini",
+            "gpt-3.5-turbo",
+        ]
+        
+        for model in regular_models:
+            assert not adapter._requires_fixed_temperature(model), f"Model {model} should not require fixed temperature"
+
+    def test_temperature_fixed_for_thinking_models(self, adapter: OpenAIAdapter) -> None:
+        """Test that GPT-5 thinking/reasoning models get fixed temperature."""
+        # Models that require fixed temperature
+        thinking_models = [
+            "gpt-5-thinking",
+            "gpt-5-reasoning",
+            "GPT-5-Thinking",  # Test case insensitivity
+        ]
+        
+        for model in thinking_models:
+            assert adapter._requires_fixed_temperature(model), f"Model {model} should require fixed temperature"
+
+    def test_temperature_override_with_warning(self, adapter: OpenAIAdapter, sample_prompt: Prompt) -> None:
+        """Test that temperature gets overridden with a warning for O-series models."""
+        mock_client = MagicMock()
+        adapter._client = mock_client
+        
+        # Create mock response
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content="Test response"))]
+        mock_response.usage = MagicMock(
+            prompt_tokens=50,
+            completion_tokens=100,
+            total_tokens=150
+        )
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        config = ProviderConfig(
+            provider="openai",
+            model="o3",
+            api_key="test-key"
+        )
+        
+        params = GenParams(
+            max_tokens=100,
+            temperature=0.7  # Non-default temperature
+        )
+        
+        # Generate with warning capture
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            response = adapter.generate(config, sample_prompt, params)
+            
+            # Check that a warning was issued
+            assert len(w) == 1
+            assert "requires temperature=1.0" in str(w[0].message)
+            assert "0.7" in str(w[0].message)
+        
+        # Check the actual call had temperature=1.0
+        call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        assert call_kwargs["temperature"] == 1.0
+
+    def test_temperature_fallback_on_api_error(self, adapter: OpenAIAdapter, sample_prompt: Prompt) -> None:
+        """Test fallback to temperature=1.0 when API rejects other values."""
+        mock_client = MagicMock()
+        adapter._client = mock_client
+        
+        # First call fails with temperature error
+        mock_client.chat.completions.create.side_effect = [
+            Exception("This model does not support temperature. Only the default (1) value is supported."),
+            MagicMock(  # Second call succeeds
+                choices=[MagicMock(message=MagicMock(content="Success"))],
+                usage=MagicMock(prompt_tokens=50, completion_tokens=100, total_tokens=150)
+            )
+        ]
+        
+        # Use a model that doesn't automatically require fixed temperature
+        config = ProviderConfig(
+            provider="openai",
+            model="gpt-5",  # GPT-5 doesn't require fixed temperature (only thinking variants do)
+            api_key="test-key"
+        )
+        
+        params = GenParams(
+            max_tokens=100,
+            temperature=0.5
+        )
+        
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            response = adapter.generate(config, sample_prompt, params)
+            
+            # Should have warned about the automatic adjustment
+            assert len(w) == 1
+            assert "Automatically adjusted" in str(w[0].message)
+            assert "0.5" in str(w[0].message)
+        
+        # Verify it was called twice
+        assert mock_client.chat.completions.create.call_count == 2
+        
+        # Check the second call had temperature=1.0
+        second_call = mock_client.chat.completions.create.call_args_list[1]
+        assert second_call.kwargs["temperature"] == 1.0
+
+    def test_no_temperature_override_for_regular_models(self, adapter: OpenAIAdapter, sample_prompt: Prompt) -> None:
+        """Test that regular models keep their requested temperature."""
+        mock_client = MagicMock()
+        adapter._client = mock_client
+        
+        mock_response = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="Test"))],
+            usage=MagicMock(prompt_tokens=50, completion_tokens=100, total_tokens=150)
+        )
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        config = ProviderConfig(
+            provider="openai",
+            model="gpt-4",
+            api_key="test-key"
+        )
+        
+        params = GenParams(
+            max_tokens=100,
+            temperature=0.3  # Custom temperature
+        )
+        
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            response = adapter.generate(config, sample_prompt, params)
+            
+            # No warnings should be issued
+            assert len(w) == 0
+        
+        # Check temperature was preserved
+        call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        assert call_kwargs["temperature"] == 0.3

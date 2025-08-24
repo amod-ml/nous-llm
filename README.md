@@ -215,7 +215,7 @@ params = GenParams(
 config = ProviderConfig(provider="openai", model="o3-mini")
 params = GenParams(
     max_tokens=1000,
-    temperature=0.7,
+    temperature=0.7,  # Will be automatically set to 1.0 with a warning
 )
 
 # Anthropic with thinking tokens
@@ -227,7 +227,13 @@ params = GenParams(
 response = generate(config, prompt, params)
 ```
 
-> **Note for Developers**: OpenAI has changed parameter naming for newer models. GPT-5 series and O-series models (o1, o3, o4-mini) use `max_completion_tokens` instead of `max_tokens`. The library automatically handles this transition with intelligent parameter mapping and fallback mechanisms, so you can continue using the standard `max_tokens` parameter in `GenParams` - it will be automatically converted to the correct parameter for each model.
+> **Note for Developers**: 
+> 
+> **Parameter Changes in OpenAI's Latest Models:**
+> - **Token Limits**: GPT-5 series and O-series models (o1, o3, o4-mini) use `max_completion_tokens` instead of `max_tokens`. The library automatically handles this with intelligent parameter mapping and fallback mechanisms.
+> - **Temperature**: O-series reasoning models (o1, o3, o4-mini) and GPT-5 thinking/reasoning variants require `temperature=1.0`. The library automatically adjusts this and warns you if a different value is requested.
+> 
+> You can continue using the standard parameters in `GenParams` - they will be automatically converted to the correct parameter for each model.
 
 ### 5. Custom Base URLs & Proxies
 
