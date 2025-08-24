@@ -24,7 +24,7 @@ Nous LLM provides a clean, unified interface for working with multiple Large Lan
 
 | Provider | Models | Status |
 |----------|--------|--------|
-|| **OpenAI** | GPT-5, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o3 | ✅ |
+|| **OpenAI** | GPT-5, GPT-5-mini, GPT-5-nano, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o3, o3-mini, o4-mini | ✅ |
 | **Anthropic** | Claude Opus 4.1, Claude 3.5 Sonnet, Claude 3 Haiku | ✅ |
 | **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash Lite | ✅ |
 | **xAI** | Grok 4, Grok 4 Heavy, Grok Beta | ✅ |
@@ -74,7 +74,7 @@ git config user.signingkey YOUR_KEY_ID
 
 | Provider | Models | Status |
 |----------|--------|--------|
-|| **OpenAI** | GPT-5, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o3 | ✅ |
+|| **OpenAI** | GPT-5, GPT-5-mini, GPT-5-nano, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o3, o3-mini, o4-mini | ✅ |
 | **Anthropic** | Claude Opus 4.1, Claude 3.5 Sonnet, Claude 3 Haiku | ✅ |
 | **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash Lite | ✅ |
 | **xAI** | Grok 4, Grok 4 Heavy, Grok Beta | ✅ |
@@ -203,12 +203,19 @@ for prompt in prompts:
 ```python
 from nous_llm import generate, ProviderConfig, Prompt, GenParams
 
-# OpenAI with reasoning mode
-config = ProviderConfig(provider="openai", model="o1-preview")
+# OpenAI GPT-5 with reasoning mode
+config = ProviderConfig(provider="openai", model="gpt-5")
 params = GenParams(
     max_tokens=1000,
     temperature=0.7,
     extra={"reasoning": True}  # OpenAI-specific
+)
+
+# OpenAI O-series reasoning model
+config = ProviderConfig(provider="openai", model="o3-mini")
+params = GenParams(
+    max_tokens=1000,
+    temperature=0.7,
 )
 
 # Anthropic with thinking tokens
@@ -219,6 +226,8 @@ params = GenParams(
 
 response = generate(config, prompt, params)
 ```
+
+> **Note for Developers**: OpenAI has changed parameter naming for newer models. GPT-5 series and O-series models (o1, o3, o4-mini) use `max_completion_tokens` instead of `max_tokens`. The library automatically handles this transition with intelligent parameter mapping and fallback mechanisms, so you can continue using the standard `max_tokens` parameter in `GenParams` - it will be automatically converted to the correct parameter for each model.
 
 ### 5. Custom Base URLs & Proxies
 

@@ -17,14 +17,15 @@ from .models import ProviderName
 # Model patterns for each provider (updated to latest models as of August 2025)
 _MODEL_PATTERNS: dict[ProviderName, list[Pattern[str]]] = {
     "openai": [
-        re.compile(r"^gpt-5.*$"),  # GPT-5 released August 2025
-        re.compile(r"^gpt-4o.*$"),
-        re.compile(r"^gpt-4.*$"),
-        re.compile(r"^gpt-3\.5-turbo.*$"),
-        re.compile(r"^o1-.*$"),  # Reasoning models
-        re.compile(r"^o3-.*$"),  # Next-gen reasoning models
-        re.compile(r"^text-.*$"),
-        re.compile(r"^davinci-.*$"),
+        re.compile(r"^gpt-5.*$"),  # GPT-5 series (August 2025)
+        re.compile(r"^gpt-4.*$"),  # GPT-4 series (includes gpt-4o, gpt-4-turbo, gpt-4.1)
+        re.compile(r"^gpt-3\.5-turbo.*$"),  # GPT-3.5 series
+        re.compile(r"^o1.*$"),  # O1 reasoning models
+        re.compile(r"^o3.*$"),  # O3 reasoning models
+        re.compile(r"^o4.*$"),  # O4 reasoning models (o4-mini)
+        re.compile(r"^text-.*$"),  # Legacy text models
+        re.compile(r"^davinci-.*$"),  # Legacy Davinci models
+        re.compile(r"^codex.*$"),  # Codex models
     ],
     "anthropic": [
         re.compile(r"^claude-opus-4.*$"),  # Claude Opus 4.1 (August 2025)
@@ -34,10 +35,10 @@ _MODEL_PATTERNS: dict[ProviderName, list[Pattern[str]]] = {
     ],
     "gemini": [
         re.compile(r"^gemini-2\.5-.*$"),  # Gemini 2.5 Pro/Flash (March 2025)
-        re.compile(r"^gemini-2\.0-.*$"),
-        re.compile(r"^gemini-1\.5-.*$"),
-        re.compile(r"^gemini-.*$"),
-        re.compile(r"^models/gemini-.*$"),
+        re.compile(r"^gemini-2\.0-.*$"),  # Gemini 2.0 Flash Lite
+        re.compile(r"^gemini-1\.5-.*$"),  # Gemini 1.5 Pro/Flash
+        re.compile(r"^gemini-1\.0-.*$"),  # Gemini 1.0 Pro
+        re.compile(r"^models/gemini-.*$"),  # API format with models/ prefix
     ],
     "xai": [
         re.compile(r"^grok-3.*$"),  # Current available model
@@ -52,7 +53,7 @@ _MODEL_PATTERNS: dict[ProviderName, list[Pattern[str]]] = {
 
 # Example models for helpful error messages (updated for 2025)
 _EXAMPLE_MODELS: dict[ProviderName, list[str]] = {
-    "openai": ["gpt-5", "gpt-5-turbo", "gpt-4o", "gpt-4-turbo", "o3-preview"],
+    "openai": ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4-turbo", "o3", "o3-mini", "o4-mini"],
     "anthropic": ["claude-opus-4.1", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
     "gemini": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash-lite"],
     "xai": ["grok-3", "grok-2-vision", "grok-2"],

@@ -6,6 +6,7 @@ openai Python package for Chat Completions API.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import anyio
@@ -74,6 +75,35 @@ class OpenAIAdapter(BaseAdapter):
                 ) from e
         return self._async_client
 
+    def _uses_completion_tokens(self, model: str) -> bool:
+        """Check if a model uses max_completion_tokens instead of max_tokens.
+        
+        Based on OpenAI's API changes as of August 2025:
+        - GPT-5 series (gpt-5, gpt-5-mini, gpt-5-nano) use max_completion_tokens
+        - O-series models (o1, o3, o4-mini, etc.) use max_completion_tokens  
+        - GPT-4 series still use max_tokens
+        - GPT-3.5 series still use max_tokens
+        
+        Args:
+            model: The model name to check.
+            
+        Returns:
+            True if model uses max_completion_tokens, False if it uses max_tokens.
+        """
+        model_lower = model.lower()
+        
+        # GPT-5 series models use max_completion_tokens
+        if model_lower.startswith("gpt-5"):
+            return True
+            
+        # O-series reasoning models use max_completion_tokens
+        # Matches: o1, o1-mini, o3, o3-mini, o3-pro, o4-mini, etc.
+        if re.match(r"^o[1-9]([-.].+)?$", model_lower):
+            return True
+            
+        # All other models (GPT-4, GPT-3.5, legacy) use max_tokens
+        return False
+
     def _build_messages(self, prompt: Prompt) -> list[dict[str, str]]:
         """Build messages list for OpenAI chat API.
 
@@ -106,10 +136,13 @@ class OpenAIAdapter(BaseAdapter):
         """
         messages = self._build_messages(prompt)
 
+        # Determine which token parameter to use based on model
+        token_param = "max_completion_tokens" if self._uses_completion_tokens(config.model) else "max_tokens"
+        
         request_params = {
             "model": config.model,
             "messages": messages,
-            "max_tokens": params.max_tokens,
+            token_param: params.max_tokens,
             "temperature": params.temperature,
         }
 
@@ -175,15 +208,9 @@ class OpenAIAdapter(BaseAdapter):
                         {
                             "index": getattr(choice, "index", None),
                             "message": {
-                                "role": (
-                                    getattr(choice.message, "role", None)
-                                    if hasattr(choice, "message")
-                                    else None
-                                ),
+                                "role": (getattr(choice.message, "role", None) if hasattr(choice, "message") else None),
                                 "content": (
-                                    getattr(choice.message, "content", None)
-                                    if hasattr(choice, "message")
-                                    else None
+                                    getattr(choice.message, "content", None) if hasattr(choice, "message") else None
                                 ),
                             },
                             "finish_reason": getattr(choice, "finish_reason", None),
@@ -261,6 +288,26 @@ class OpenAIAdapter(BaseAdapter):
             return self._parse_response(response, config)
 
         except Exception as e:
+            # Check for the specific max_tokens parameter error and retry with fallback
+            error_str = str(e)
+            if ("max_tokens" in error_str and 
+                "not supported" in error_str and 
+                "max_completion_tokens" in error_str):
+                
+                # Retry with max_completion_tokens parameter
+                request_params_fallback = request_params.copy()
+                if "max_tokens" in request_params_fallback:
+                    token_value = request_params_fallback.pop("max_tokens")
+                    request_params_fallback["max_completion_tokens"] = token_value
+                    
+                    try:
+                        response = client.chat.completions.create(**request_params_fallback)
+                        return self._parse_response(response, config)
+                    except Exception as fallback_e:
+                        # If fallback also fails, raise the fallback error
+                        raise self._handle_openai_exception(fallback_e) from fallback_e
+            
+            # If not the specific parameter error, or fallback failed, raise original error
             raise self._handle_openai_exception(e) from e
 
     async def agenenerate(
@@ -289,6 +336,25 @@ class OpenAIAdapter(BaseAdapter):
             return self._parse_response(response, config)
 
         except Exception as e:
+            # Check for the specific max_tokens parameter error and retry with fallback
+            error_str = str(e)
+            if ("max_tokens" in error_str and 
+                "not supported" in error_str and 
+                "max_completion_tokens" in error_str):
+                
+                # Retry with max_completion_tokens parameter
+                request_params_fallback = request_params.copy()
+                if "max_tokens" in request_params_fallback:
+                    token_value = request_params_fallback.pop("max_tokens")
+                    request_params_fallback["max_completion_tokens"] = token_value
+                    
+                    try:
+                        response = await client.chat.completions.create(**request_params_fallback)
+                        return self._parse_response(response, config)
+                    except Exception as fallback_e:
+                        # If fallback also fails, raise the fallback error
+                        raise self._handle_openai_exception(fallback_e) from fallback_e
+            
             # Try fallback to sync in thread if async fails
             if "async" in str(e).lower():
                 return await anyio.to_thread.run_sync(self.generate, config, prompt, params)
