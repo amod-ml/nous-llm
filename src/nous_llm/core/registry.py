@@ -22,7 +22,7 @@ _MODEL_PATTERNS: dict[ProviderName, list[Pattern[str]]] = {
         re.compile(r"^gpt-4.*$"),
         re.compile(r"^gpt-3\.5-turbo.*$"),
         re.compile(r"^o1-.*$"),  # Reasoning models
-        re.compile(r"^o2-.*$"),  # Next-gen reasoning models
+        re.compile(r"^o3-.*$"),  # Next-gen reasoning models
         re.compile(r"^text-.*$"),
         re.compile(r"^davinci-.*$"),
     ],
@@ -52,7 +52,7 @@ _MODEL_PATTERNS: dict[ProviderName, list[Pattern[str]]] = {
 
 # Example models for helpful error messages (updated for 2025)
 _EXAMPLE_MODELS: dict[ProviderName, list[str]] = {
-    "openai": ["gpt-5", "gpt-5-turbo", "gpt-4o", "gpt-4-turbo", "o2-preview"],
+    "openai": ["gpt-5", "gpt-5-turbo", "gpt-4o", "gpt-4-turbo", "o3-preview"],
     "anthropic": ["claude-opus-4.1", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
     "gemini": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash-lite"],
     "xai": ["grok-3", "grok-2-vision", "grok-2"],

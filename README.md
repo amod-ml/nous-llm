@@ -24,7 +24,7 @@ Nous LLM provides a clean, unified interface for working with multiple Large Lan
 
 | Provider | Models | Status |
 |----------|--------|--------|
-| **OpenAI** | GPT-5, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o2 | ✅ |
+|| **OpenAI** | GPT-5, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o3 | ✅ |
 | **Anthropic** | Claude Opus 4.1, Claude 3.5 Sonnet, Claude 3 Haiku | ✅ |
 | **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash Lite | ✅ |
 | **xAI** | Grok 4, Grok 4 Heavy, Grok Beta | ✅ |
@@ -74,7 +74,7 @@ git config user.signingkey YOUR_KEY_ID
 
 | Provider | Models | Status |
 |----------|--------|--------|
-| **OpenAI** | GPT-5, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o2 | ✅ |
+|| **OpenAI** | GPT-5, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o3 | ✅ |
 | **Anthropic** | Claude Opus 4.1, Claude 3.5 Sonnet, Claude 3 Haiku | ✅ |
 | **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash Lite | ✅ |
 | **xAI** | Grok 4, Grok 4 Heavy, Grok Beta | ✅ |

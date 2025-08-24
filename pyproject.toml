@@ -3,15 +3,15 @@ name = "nous-llm"
 version = "0.1.1"
 description = "Intelligent No Frills LLM Router - A unified interface for multiple LLM providers"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "MPL-2.0"}
 authors = [
-    {name = "Amod ML", email = "amod@example.com"},
+    {name = "Amod ML", email = "amodsahabandu@icloud.com"},
 ]
 keywords = ["llm", "openai", "anthropic", "gemini", "xai", "openrouter", "ai", "ml"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

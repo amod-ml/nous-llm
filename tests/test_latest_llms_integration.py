@@ -540,7 +540,7 @@ class TestLatestLLMs2025:
         valid_models = [
             ("openai", "gpt-5"),
             ("openai", "gpt-5-turbo"),
-            ("openai", "o2-preview"),
+            ("openai", "o3-preview"),
             ("anthropic", "claude-opus-4.1"),
             ("gemini", "gemini-2.5-pro"),
             ("gemini", "gemini-2.5-flash"),
