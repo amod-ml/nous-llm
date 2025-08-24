@@ -2,15 +2,24 @@
 
 > **Intelligent No Frills LLM Router** - A unified Python interface for multiple Large Language Model providers
 
+[![PyPI version](https://badge.fury.io/py/nous-llm.svg)](https://badge.fury.io/py/nous-llm)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Issues](https://img.shields.io/github/issues/amod-ml/nous-llm)](https://github.com/amod-ml/nous-llm/issues)
 
-## Overview
+## Why Nous LLM?
 
-Nous LLM provides a clean, unified interface for working with multiple Large Language Model providers including OpenAI, Anthropic Claude, Google Gemini, xAI Grok, and OpenRouter. Built with modern Python practices, full type safety, and production-ready features.
+Switch between LLM providers with a single line of code. Build AI applications without vendor lock-in.
 
-## Key Features
+```python
+# Same interface, different providers
+config = ProviderConfig(provider="openai", model="gpt-4o")     # OpenAI
+config = ProviderConfig(provider="anthropic", model="claude-3-5-sonnet")  # Anthropic
+config = ProviderConfig(provider="gemini", model="gemini-2.5-pro")  # Google
+```
+
+## ✨ Key Features
 
 - **🔄 Unified Interface**: Single API for multiple LLM providers
 - **⚡ Async Support**: Both synchronous and asynchronous interfaces  
@@ -20,65 +29,33 @@ Nous LLM provides a clean, unified interface for working with multiple Large Lan
 - **🚨 Error Handling**: Comprehensive error taxonomy with provider context
 - **🔌 Extensible**: Plugin architecture for custom providers
 
-## Supported Providers
+## 🚀 Quick Start
 
-| Provider | Models | Status |
-|----------|--------|--------|
-|| **OpenAI** | GPT-5, GPT-5-mini, GPT-5-nano, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o3, o3-mini, o4-mini | ✅ |
-| **Anthropic** | Claude Opus 4.1, Claude 3.5 Sonnet, Claude 3 Haiku | ✅ |
-| **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash Lite | ✅ |
-| **xAI** | Grok 4, Grok 4 Heavy, Grok Beta | ✅ |
-| **OpenRouter** | Llama 4 Maverick, Llama 3.3 70B, 100+ models via proxy | ✅ |
+### Install
 
-## 🔒 Security & Development Requirements
-
-### GPG Signing Required
-
-**ALL commits to this repository MUST be GPG-signed.** This is automatically enforced by a pre-commit hook.
-
-#### Why GPG Signing?
-- **🔐 Authentication**: Every commit is cryptographically verified
-- **🛡️ Integrity**: Commits cannot be tampered with after signing  
-- **📝 Non-repudiation**: Contributors cannot deny authorship of signed commits
-- **🔗 Supply Chain Security**: Protection against commit spoofing attacks
-
-#### Quick Setup for Contributors
-
-**New to the project?**
 ```bash
-# Automated setup - installs hook and guides through GPG configuration
-./scripts/setup-gpg-hook.sh
+pip install nous-llm
 ```
 
-**Already have GPG configured?**
-```bash
-# Enable GPG signing for this repository
-git config commit.gpgsign true
-git config user.signingkey YOUR_KEY_ID
+### Use in 3 Lines
+
+```python
+from nous_llm import generate, ProviderConfig, Prompt
+
+config = ProviderConfig(provider="openai", model="gpt-4o")
+response = generate(config, Prompt(input="What is the capital of France?"))
+print(response.text)  # "Paris is the capital of France."
 ```
 
-#### Important Notes
-- ❌ Unsigned commits will be automatically rejected
-- ✅ The pre-commit hook validates your GPG setup before every commit
-- 📋 You must add your GPG public key to your GitHub account
-- 🚫 The hook cannot be bypassed with `--no-verify`
+## 📦 Supported Providers
 
-#### Need Help?
-- 📖 **Full Setup Guide**: [GPG Signing Documentation](docs/GPG-SIGNING.md)
-- 🔧 **Troubleshooting**: Run `./scripts/setup-gpg-hook.sh` for diagnostics
-- 🧪 **Quick Test**: Try making a commit - the hook will guide you if anything's wrong
-
----
-
-## Supported Providers
-
-| Provider | Models | Status |
-|----------|--------|--------|
-|| **OpenAI** | GPT-5, GPT-5-mini, GPT-5-nano, GPT-4o, GPT-4, GPT-3.5-turbo, o1, o3, o3-mini, o4-mini | ✅ |
-| **Anthropic** | Claude Opus 4.1, Claude 3.5 Sonnet, Claude 3 Haiku | ✅ |
-| **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash Lite | ✅ |
-| **xAI** | Grok 4, Grok 4 Heavy, Grok Beta | ✅ |
-| **OpenRouter** | Llama 4 Maverick, Llama 3.3 70B, 100+ models via proxy | ✅ |
+| Provider | Popular Models | Latest Models |
+|----------|---------------|---------------|
+| **OpenAI** | GPT-4o, GPT-4-turbo, GPT-3.5-turbo | GPT-5, o3, o4-mini |
+| **Anthropic** | Claude 3.5 Sonnet, Claude 3 Haiku | Claude Opus 4.1 |
+| **Google** | Gemini 1.5 Pro, Gemini 1.5 Flash | Gemini 2.5 Pro |
+| **xAI** | Grok Beta | Grok 4, Grok 4 Heavy |
+| **OpenRouter** | Llama 3.3 70B, Mixtral | Llama 4 Maverick |
 
 ## Installation
 
@@ -378,20 +355,68 @@ uv run mypy src/nous_llm
 - 🐛 [Issue Tracker](https://github.com/amod-ml/nous-llm/issues)
 - 💬 [Discussions](https://github.com/amod-ml/nous-llm/discussions)
 
-## Contributing
+## 🐛 Found an Issue?
 
-We welcome contributions! 
+We'd love to hear from you! Please [report any issues](https://github.com/amod-ml/nous-llm/issues/new) you encounter. When reporting issues, please include:
 
-### Requirements
+- Python version
+- Nous LLM version (`pip show nous-llm`)
+- Minimal code to reproduce the issue
+- Full error traceback
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### 🔒 Security Requirements for Contributors
+
+**ALL commits to this repository MUST be GPG-signed.** This is automatically enforced by a pre-commit hook.
+
+#### Why GPG Signing?
+- **🔐 Authentication**: Every commit is cryptographically verified
+- **🛡️ Integrity**: Commits cannot be tampered with after signing  
+- **📝 Non-repudiation**: Contributors cannot deny authorship of signed commits
+- **🔗 Supply Chain Security**: Protection against commit spoofing attacks
+
+#### Quick Setup for Contributors
+
+**New to the project?**
+```bash
+# Automated setup - installs hook and guides through GPG configuration
+./scripts/setup-gpg-hook.sh
+```
+
+**Already have GPG configured?**
+```bash
+# Enable GPG signing for this repository
+git config commit.gpgsign true
+git config user.signingkey YOUR_KEY_ID
+```
+
+#### Important Notes
+- ❌ Unsigned commits will be automatically rejected
+- ✅ The pre-commit hook validates your GPG setup before every commit
+- 📋 You must add your GPG public key to your GitHub account
+- 🚫 The hook cannot be bypassed with `--no-verify`
+
+#### Need Help?
+- 📖 **Full Setup Guide**: [GPG Signing Documentation](docs/GPG-SIGNING.md)
+- 🔧 **Troubleshooting**: Run `./scripts/setup-gpg-hook.sh` for diagnostics
+- 🧪 **Quick Test**: Try making a commit - the hook will guide you if anything's wrong
+
+### Development Requirements
 - ✅ Python 3.12+
 - 🔐 All commits must be GPG-signed
 - 🧪 Code must pass all tests and linting
 - 📋 Follow established patterns and conventions
 
-## License
+## 📄 License
 
 This project is licensed under the **Mozilla Public License 2.0** - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-*🔒 GPG signing ensures the authenticity and integrity of all code contributions.*
+<p align="center">
+  <strong>Built with ❤️ for the AI community</strong><br>
+  <em>🔒 GPG signing ensures the authenticity and integrity of all code contributions</em>
+</p>
