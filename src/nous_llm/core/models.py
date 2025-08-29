@@ -77,8 +77,8 @@ class GenParams(BaseModel):
         ... )
     """
 
-    max_tokens: int = Field(default=512, ge=1, le=32000, description="Maximum tokens to generate")
-    temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
+    max_tokens: int | None = Field(default=None, ge=1, le=32000, description="Maximum tokens to generate")
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: float | None = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling")
     stop: list[str] | None = Field(default=None, description="Stop sequences")
     extra: dict[str, Any] = Field(default_factory=dict, description="Provider-specific parameters")
