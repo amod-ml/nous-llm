@@ -77,7 +77,7 @@ class GenParams(BaseModel):
         ... )
     """
 
-    max_tokens: int | None = Field(default=None, ge=1, le=32000, description="Maximum tokens to generate")
+    max_tokens: int | None = Field(default=None, ge=1, description="Maximum tokens to generate")
     temperature: float | None = Field(default=None, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: float | None = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling")
     stop: list[str] | None = Field(default=None, description="Stop sequences")
