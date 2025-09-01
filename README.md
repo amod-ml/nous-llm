@@ -282,7 +282,7 @@ except ProviderError as e:
     print(f"Provider error: {e}")
 ```
 
-### OpenRouter Thinking Functionality
+### 6. OpenRouter Thinking Functionality
 
 OpenRouter supports thinking/reasoning functionality across multiple model families with different parameter configurations:
 
