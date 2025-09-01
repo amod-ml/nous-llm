@@ -67,32 +67,60 @@ class GeminiAdapter(BaseAdapter):
                 ) from e
         return self._async_client
 
-    def _build_generation_config(self, params: GenParams) -> dict[str, Any]:
-        """Build generation configuration for Gemini.
+    def _build_generation_config(self, params: GenParams):
+        """Build generation configuration for Gemini using proper SDK types.
 
         Args:
             params: Generation parameters.
 
         Returns:
-            Gemini generation configuration.
+            GenerateContentConfig instance.
         """
-        config = {
+        try:
+            from google.genai import types
+        except ImportError as e:
+            raise ProviderError(
+                "google-genai package not installed. Install with: pip install google-genai",
+                provider="gemini",
+            ) from e
+
+        # Build generation config dict
+        generation_config = {
             "max_output_tokens": params.max_tokens,
             "temperature": params.temperature,
         }
 
         if params.top_p is not None:
-            config["top_p"] = params.top_p
+            generation_config["top_p"] = params.top_p
 
         if params.stop:
-            config["stop_sequences"] = params.stop
+            generation_config["stop_sequences"] = params.stop
 
         # Add Gemini-specific parameters
         for key, value in params.extra.items():
             if key in ["top_k", "candidate_count", "response_mime_type"]:
-                config[key] = value
+                generation_config[key] = value
 
-        return config
+        # Build thinking config if thinking parameters are provided
+        thinking_config = None
+        thinking_params = {}
+
+        # Check for thinking parameters in extra
+        if "include_thoughts" in params.extra:
+            thinking_params["include_thoughts"] = params.extra["include_thoughts"]
+        if "thinking_budget" in params.extra:
+            thinking_params["thinking_budget"] = params.extra["thinking_budget"]
+
+        if thinking_params:
+            thinking_config = types.ThinkingConfig(**thinking_params)
+
+        # Create GenerateContentConfig with proper types
+        config_params = {"generation_config": types.GenerationConfig(**generation_config)}
+
+        if thinking_config:
+            config_params["thinking_config"] = thinking_config
+
+        return types.GenerateContentConfig(**config_params)
 
     def _build_content(self, prompt: Prompt) -> str:
         """Build content string for Gemini API.
@@ -104,6 +132,50 @@ class GeminiAdapter(BaseAdapter):
             Formatted content string.
         """
         return f"System: {prompt.instructions}\n\nUser: {prompt.input}"
+
+    def _extract_candidate_content(self, candidate) -> tuple[str, str]:
+        """Extract text and thinking content from a candidate.
+
+        Args:
+            candidate: Response candidate from Gemini API.
+
+        Returns:
+            Tuple of (text_content, thinking_content).
+        """
+        text_content = ""
+        thinking_content = ""
+
+        if hasattr(candidate, "content") and candidate.content:
+            if hasattr(candidate.content, "parts"):
+                for part in candidate.content.parts:
+                    if hasattr(part, "text"):
+                        text_content += part.text
+                    elif hasattr(part, "thought") and part.thought:
+                        thinking_content += part.thought
+            elif hasattr(candidate.content, "text"):
+                text_content = candidate.content.text
+
+        return text_content, thinking_content
+
+    def _combine_thinking_content(self, thinking_content: str, text_content: str) -> str:
+        """Combine thinking and regular content into a formatted response.
+
+        Args:
+            thinking_content: The model's thinking process.
+            text_content: The model's final response.
+
+        Returns:
+            Combined formatted content.
+        """
+        if thinking_content and text_content:
+            # Add thinking content as a separate section
+            return f"**Thinking:**\n{thinking_content}\n\n**Response:**\n{text_content}"
+        elif thinking_content and not text_content:
+            # Only thinking content available
+            return f"**Thinking:**\n{thinking_content}"
+        else:
+            # Only regular content or no content
+            return text_content
 
     def _parse_response(
         self,
@@ -122,18 +194,19 @@ class GeminiAdapter(BaseAdapter):
         try:
             # Extract text content - new SDK returns text directly
             text_content = ""
+            thinking_content = ""
+
             if hasattr(response, "text") and response.text:
                 text_content = response.text
             elif hasattr(response, "candidates") and response.candidates:
-                # Handle structured response format
-                candidate = response.candidates[0]
-                if hasattr(candidate, "content") and candidate.content:
-                    if hasattr(candidate.content, "parts"):
-                        for part in candidate.content.parts:
-                            if hasattr(part, "text"):
-                                text_content += part.text
-                    elif hasattr(candidate.content, "text"):
-                        text_content = candidate.content.text
+                text_content, thinking_content = self._extract_candidate_content(response.candidates[0])
+
+            # Check for thinking content in response
+            if hasattr(response, "thinking") and response.thinking:
+                thinking_content = response.thinking
+
+            # Combine thinking and regular content if both exist
+            text_content = self._combine_thinking_content(thinking_content, text_content)
 
             # Extract usage information
             usage = None
@@ -153,6 +226,9 @@ class GeminiAdapter(BaseAdapter):
 
             if hasattr(response, "usage_metadata"):
                 raw_data["usage_metadata"] = getattr(response, "usage_metadata", None)
+
+            if hasattr(response, "thinking"):
+                raw_data["thinking"] = getattr(response, "thinking", None)
 
             if hasattr(response, "candidates"):
                 raw_data["candidates"] = []
