@@ -204,7 +204,7 @@ params = GenParams(
 response = generate(config, prompt, params)
 ```
 
-### 5. Gemini Thinking Functionality
+### 4. Gemini Thinking Functionality
 
 ```python
 from nous_llm import generate, ProviderConfig, Prompt, GenParams
