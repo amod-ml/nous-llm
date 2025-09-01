@@ -204,6 +204,49 @@ params = GenParams(
 response = generate(config, prompt, params)
 ```
 
+### 5. Gemini Thinking Functionality
+
+```python
+from nous_llm import generate, ProviderConfig, Prompt, GenParams
+
+# Enable thinking mode for enhanced reasoning
+config = ProviderConfig(
+    provider="gemini", 
+    model="gemini-2.5-pro"  # Use thinking-enabled model
+)
+
+prompt = Prompt(
+    instructions="You are a math tutor. Show your step-by-step reasoning.",
+    input="Calculate the area of a circle with radius 7 cm, then find what percentage this is of a square with side length 15 cm."
+)
+
+# Configure thinking parameters
+params = GenParams(
+    max_tokens=1500,
+    temperature=0.3,
+    extra={
+        "include_thoughts": True,      # Show the model's reasoning process
+        "thinking_budget": 8000        # Allow up to 8000 tokens for thinking
+    }
+)
+
+response = generate(config, prompt, params)
+print(response.text)
+
+# Output format:
+# **Thinking:**
+# Let me break this down step by step...
+# First, I need to calculate the area of the circle...
+# 
+# **Response:**
+# The area of the circle is approximately 153.94 cm²...
+```
+
+**Thinking Parameters:**
+- `include_thoughts`: Boolean to enable/disable thinking output
+- `thinking_budget`: Integer token budget for the thinking process
+- Works with thinking-enabled models like `gemini-2.5-pro`
+
 > **Note for Developers**: 
 > 
 > **Parameter Changes in OpenAI's Latest Models:**
@@ -238,6 +281,135 @@ except RateLimitError as e:
 except ProviderError as e:
     print(f"Provider error: {e}")
 ```
+
+### OpenRouter Thinking Functionality
+
+OpenRouter supports thinking/reasoning functionality across multiple model families with different parameter configurations:
+
+```python
+from nous_llm import generate, ProviderConfig, Prompt, GenParams
+
+# OpenAI o-series models (effort-based reasoning)
+config = ProviderConfig(
+    provider="openrouter",
+    model="openai/o1-preview",
+    api_key="your-openrouter-key"
+)
+
+prompt = Prompt(
+    instructions="You are a math tutor. Show your reasoning clearly.",
+    input="Calculate compound interest on $1000 at 5% for 3 years."
+)
+
+# Effort-based reasoning (OpenAI o1/o3/GPT-5 models)
+params = GenParams(
+    max_tokens=2000,
+    temperature=1.0,  # Required for o-series models
+    extra={
+        "reasoning_effort": "high",      # "low", "medium", "high"
+        "reasoning_exclude": False       # Include reasoning in response
+    }
+)
+
+response = generate(config, prompt, params)
+print(response.text)
+```
+
+**Different Model Types:**
+
+```python
+# Anthropic Claude (max_tokens-based reasoning)
+config = ProviderConfig(
+    provider="openrouter",
+    model="anthropic/claude-3-5-sonnet",
+    api_key="your-openrouter-key"
+)
+
+params = GenParams(
+    max_tokens=1500,
+    extra={
+        "reasoning_max_tokens": 6000,    # Token budget for reasoning
+        "reasoning_exclude": False       # Show reasoning process
+    }
+)
+
+# xAI Grok (effort-based reasoning)
+config = ProviderConfig(
+    provider="openrouter", 
+    model="xai/grok-beta",
+    api_key="your-openrouter-key"
+)
+
+params = GenParams(
+    max_tokens=2000,
+    extra={
+        "reasoning_effort": "medium",    # Reasoning effort level
+        "reasoning_exclude": True        # Hide reasoning, show only final answer
+    }
+)
+
+# Legacy parameter support (backward compatibility)
+params = GenParams(
+    max_tokens=1500,
+    extra={
+        "include_thoughts": True,        # Enable thinking
+        "thinking_budget": 4000          # Token budget (maps to appropriate param)
+    }
+)
+```
+
+**Supported Models:**
+- **OpenAI**: o1-preview, o1-mini, o3-mini, gpt-5-turbo (effort-based)
+- **Anthropic**: claude-3-5-sonnet, claude-3-5-haiku (max_tokens-based)  
+- **xAI**: grok-beta, grok-2 (effort-based)
+- **Google**: gemini-2.0-flash-thinking-exp (max_tokens-based)
+
+The adapter automatically detects model capabilities and applies the correct reasoning parameters.
+
+### Dynamic Token Limits
+
+The library now supports dynamic token limits based on actual provider and model capabilities, replacing the previous static 32k limit:
+
+```python
+from nous_llm import generate, ProviderConfig, Prompt, GenParams
+
+# High-capacity models now supported
+config = ProviderConfig(
+    provider="openai",
+    model="gpt-oss-120b",  # Supports 131,072 tokens
+    api_key="your-api-key"
+)
+
+params = GenParams(
+    max_tokens=100000,  # No longer limited to 32k
+    temperature=0.7
+)
+
+response = generate(config, prompt, params)
+```
+
+**Model-Specific Limits:**
+- **OpenAI**: 4,096 (GPT-4o Realtime) to 131,072 (GPT-OSS series)
+- **Gemini**: 2,048 (Gemini 2.0 Flash) to 65,536 (Gemini 2.5 series)
+- **xAI**: 32,768 tokens (Grok series)
+- **Anthropic**: 16,384 tokens (Claude series)
+- **OpenRouter**: Varies by underlying model
+
+The library automatically validates token limits and provides clear error messages:
+
+```python
+# This will raise ValueError with helpful message
+params = GenParams(max_tokens=200000)  # Exceeds model limit
+response = generate(config, prompt, params)
+# ValueError: max_tokens (200000) exceeds model limit (131072) for openai/gpt-oss-120b
+```
+
+**Benefits:**
+- ✅ No artificial 32k limit restriction
+- ✅ Model-specific accurate validation
+- ✅ Support for high-capacity models
+- ✅ Automatic limit detection and caching
+- ✅ Clear error messages when limits exceeded
 
 ## Production Integration
 

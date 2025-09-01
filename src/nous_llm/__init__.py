@@ -40,7 +40,7 @@ __all__ = [
     "RateLimitError",
     "Usage",
     "ValidationError",
+    "__version__",
     "agenenerate",
     "generate",
-    "__version__",
 ]

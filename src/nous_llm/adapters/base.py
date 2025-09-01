@@ -18,7 +18,8 @@ from tenacity import (
 )
 
 from ..core.exceptions import AuthError, ProviderError, RateLimitError
-from ..core.models import ProviderConfig, Usage
+from ..core.models import GenParams, ProviderConfig, Usage
+from ..core.token_validator import TokenLimitValidator
 
 
 class BaseAdapter:
@@ -214,6 +215,27 @@ class BaseAdapter:
             raise self._map_http_error(response, "unknown")
 
         return response
+
+    def _validate_token_limits(
+        self,
+        params: GenParams,
+        config: ProviderConfig,
+    ) -> GenParams:
+        """Validate token limits against provider/model capabilities.
+
+        Args:
+            params: Generation parameters to validate
+            config: Provider configuration
+
+        Returns:
+            Validated parameters (may raise exception if invalid)
+
+        Raises:
+            ValueError: If max_tokens exceeds model capabilities
+        """
+        if params.max_tokens is not None:
+            TokenLimitValidator.validate_max_tokens(params.max_tokens, config.provider, config.model, config.api_key)
+        return params
 
     def close(self) -> None:
         """Close HTTP clients and clean up resources."""
