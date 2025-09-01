@@ -1,6 +1,6 @@
 [project]
 name = "nous-llm"
-version = "0.2.0"
+version = "0.3.0"
 description = "Intelligent No Frills LLM Router - A unified interface for multiple LLM providers"
 readme = "README.md"
 license = {text = "MPL-2.0"}
