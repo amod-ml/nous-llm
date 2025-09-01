@@ -90,13 +90,13 @@ def demonstrate_token_limits():
 
             # Test with valid token count
             valid_params = GenParams(max_tokens=1000)
-            adapter._validate_token_limits(valid_params, config)
+            adapter.generate(config, Prompt(instructions="test", input="test"), valid_params)
             print(f"{name}: ✅ Valid token count (1000) accepted")
 
             # Test with excessive token count
             try:
                 invalid_params = GenParams(max_tokens=999999)
-                adapter._validate_token_limits(invalid_params, config)
+                adapter.generate(config, Prompt(instructions="test", input="test"), invalid_params)
                 print(f"{name}: ❌ Excessive tokens unexpectedly accepted")
             except ValueError:
                 print(f"{name}: ✅ Excessive tokens correctly rejected")
